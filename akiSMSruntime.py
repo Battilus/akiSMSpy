@@ -37,7 +37,7 @@ class ThreadDI(threading.Thread):
 				
 				if (self._DIxt[i] >= self.k__cycle) and self.chEN[i] == 1:	#если на входе реально есть сигнал, то:
 					self.timeS[i] = getDatetime()	#записываем актуальное время срабатывания входа
-					self.DIresult[i] = 1	#пишем флаг для отправки смс
+					self.DIres[i] = 1	#пишем флаг для отправки смс
 					self.DIresult = self._invers(self._DIres[i], self.invers[i] self.DIresult[i])	#инвертируем состоянме входа(если нужно)
 					self._DIxt[i] = 0	#обновляем счетчик фильтрации входа
 					self._last[i] = 1	#фиксим состояние как предидущее, пока на входе не пропадет сигнал
