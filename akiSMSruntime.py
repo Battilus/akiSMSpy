@@ -8,17 +8,20 @@ class ThreadDI(threading.Thread):
 
 	def __init__(self, bits, t_delay, t_filter, DIflags):
 		threading.Thread.__init__(self)
-		self.bits = bits
-		self.DI = [0] * bits
-		self.DIxt = [0] * bits
-		self.last = [0] * bits
-		self.timeS = [''] * bits
-		self.DIresult = DIflags
+		self.bits = bits	#количество используемых входов (8 или 16) (может будет и больше, если решим добавить в будущем модули)
+		self.DI = [0] * bits	#актуальное состояние входов 
+		self.invers = [0] * bits	#режим работы входов (обычниый или инвертирован)
+		self._DIxt = [0] * bits	#количество успешных опросов (раз в t_delay) входа (для фильтрации дребезга)
+		self._last = [0] * bits	#предидущее состояние входа
+		self.chEN = [0] * bits	#разрешение на изменение флага отправки смс (для блокировки ненужных входов и избежания отпраки ложных смс)
+		self.timeS = [''] * bits	#актуальное время на момент срабатывания входа (для отправки по смс)
+		self._DIres = [0] * bits #флаги для отправки СМС (отфильтрованное состояние входа (возвращается в 0 после успешной отправки СМС))
+		self.DIresult = DIflags	#флаги для отправки смс ПОСЛЕ ИНВЕРТОРА
 		self.cycle = t_delay #интервалы опроса входов
 		self.tDIdelay = t_filter #sec время для фильтрации входа
 		self.k__cycle = 0	#количество циклов в течении которых на входе должно быть True
 		self.time_k = self.cycle * 1000
-		self.th_start = True
+		self.th_start = True	#запускает while в потоке
 
 	def run(self):
 		print("Thread Run!")
@@ -26,16 +29,18 @@ class ThreadDI(threading.Thread):
 		while self.th_start:
 			self.DI = mDI.readDataFromPort(self.DI, self.bits)
 			for i in range(self.bits):
-				if self.DI[i] == 1 and self.DIresult[i] == 0 and self.last[i] == 0: self.DIxt[i] += 1
+				if self.DI[i] == 1 and self.DIresult[i] == 0 and self._last[i] == 0: 
+					self._DIxt[i] += 1
 				elif self.DI[i] == 0: 
-					self.DIxt[i] = 0
-					self.last[i] = 0
+					self._DIxt[i] = 0
+					self._last[i] = 0
 				
-				if self.DIxt[i] >= self.k__cycle:
-					self.timeS[i] = getDatetime()
-					self.DIresult[i] = 1
-					self.DIxt[i] = 0
-					self.last[i] = 1
+				if (self._DIxt[i] >= self.k__cycle) and self.chEN[i] == 1:	#если на входе реально есть сигнал, то:
+					self.timeS[i] = getDatetime()	#записываем актуальное время срабатывания входа
+					self.DIresult[i] = 1	#пишем флаг для отправки смс
+					self.DIresult = self._invers(self._DIres[i], self.invers[i] self.DIresult[i])	#инвертируем состоянме входа(если нужно)
+					self._DIxt[i] = 0	#обновляем счетчик фильтрации входа
+					self._last[i] = 1	#фиксим состояние как предидущее, пока на входе не пропадет сигнал
 	
 			time.sleep(self.cycle)
 		print("Thread Stoped")
@@ -46,6 +51,15 @@ class ThreadDI(threading.Thread):
 
 	def _k_cycle(self):
 		self.k__cycle = round(((self.tDIdelay * self.time_k) * self.cycle) - 1)
+
+	def _invers(in_DI, in_invers, in_DIres):
+		if in_DI==1:
+			if in_invers==1: in_DIres = 0
+			else: in_DIres = 1
+		else:
+			if in_invers==1: in_DIres = 1
+			else: in_DIres = 0
+
 
 def main():
 
@@ -78,6 +92,8 @@ def main():
 	print("Main Run!")
 	while True:
 
+		t1.chEN = sendEN
+		t1.invers = DIinvers
 		_fs_DI = t1.DIresult
 		timeS = t1.timeS
 
@@ -144,27 +160,31 @@ try:
 	smstxtDI = [""] * BIT
 	#*********************
 
-	#Active threads
-	t1 = ThreadDI(BIT, 0.1, 3, _fs_DI)
-	t1.start()
-	#*********************
-	
 	#Внешние переменные (для сервера)
+	sendEN = [0] * BIT	#флаг блокировки изменеия флагов отправки смс сообщений
+	DIinvers = [0] * BIT	#делает инверсной работу входов
+	t_filterDI = 3 #время фильтрации дребезга контактов
 	_fs_alive = 0
 	smsAlive_EN = 0
 	smsReboot_EN = 1
-	smsStartup_EN = 1
+	smsStartup_EN = 0
 	smsNumbers = ["+79184778396"]	#Справочник номеров телефонов
 
 	#Текст смс привязанный к входам (индекс к индексу)
 	txtDI = ["DI0 some text...",
-			"DI1 some text...",
+			"DI1 some text...(invers)",
 			"DI2 some text...",
 			"DI3 some text..."]
 	#*********************
-
 	for i in range(len(txtDI)):	#Подстраховка на случай если не все поля сообщений заполнены
 		smstxtDI.insert(i, txtDI[i])
+		sendEN[i] = 1	#УБРАТЬ ПРИ ПОДКЛЮЧЕНИИ К СЕРВАКУ111111111111111111
+
+	DIinvers[1] = 1
+	#Active threads
+	t1 = ThreadDI(BIT, 0.1, t_filterDI, _fs_DI)
+	t1.start()
+	#*********************
 
 	startPow = 0
 	while startPow!=1:	startPow = modSTARTUP()	#Включаем модем
