@@ -15,8 +15,8 @@ class ThreadDI(threading.Thread):
 		self._last = [0] * bits	#предидущее состояние входа
 		self.chEN = [0] * bits	#разрешение на изменение флага отправки смс (для блокировки ненужных входов и избежания отпраки ложных смс)
 		self.timeS = [''] * bits	#актуальное время на момент срабатывания входа (для отправки по смс)
-		self._DIres = [0] * bits #флаги для отправки СМС (отфильтрованное состояние входа (возвращается в 0 после успешной отправки СМС))
-		self.DIresult = DIflags	#флаги для отправки смс ПОСЛЕ ИНВЕРТОРА
+		self._DI_on = [0] * bits #отфильтрованное состояние входа
+		self.DIresult = DIflags	#флаги для отправки СМС (отфильтрованное состояние входа (возвращается в 0 после успешной отправки СМС))
 		self.cycle = t_delay #интервалы опроса входов
 		self.tDIdelay = t_filter #sec время для фильтрации входа
 		self.k__cycle = 0	#количество циклов в течении которых на входе должно быть True
@@ -32,13 +32,16 @@ class ThreadDI(threading.Thread):
 				if self.DI[i] == 1 and self.DIresult[i] == 0 and self._last[i] == 0: 
 					self._DIxt[i] += 1
 				elif self.DI[i] == 0: 
-					self._DIxt[i] = 0
 					self._last[i] = 0
+					self._DIxt[i] = 0
+					self._DI_on[i] = self._invers(0, self.invers[i])
 				
-				if (self._DIxt[i] >= self.k__cycle) and self.chEN[i] == 1:	#если на входе реально есть сигнал, то:
+				if self._DIxt[i] >= self.k__cycle:	#если на входе реально есть сигнал(т.е. на входе непрерывно висит сигнал в течении заданного времени), то:
+					self._DI_on[i] = self._invers(1, self.invers[i])	#инвертируем состоянме входа(если нужно)
+				
+				if self._DI_on[i]==1 and self.chEN[i] == 1 and self._last[i] == 0:
 					self.timeS[i] = getDatetime()	#записываем актуальное время срабатывания входа
-					self.DIres[i] = 1	#пишем флаг для отправки смс
-					self.DIresult = self._invers(self._DIres[i], self.invers[i] self.DIresult[i])	#инвертируем состоянме входа(если нужно)
+					self.DIresult[i] = 1	#пишем флаг для отправки смс					
 					self._DIxt[i] = 0	#обновляем счетчик фильтрации входа
 					self._last[i] = 1	#фиксим состояние как предидущее, пока на входе не пропадет сигнал
 	
@@ -52,8 +55,8 @@ class ThreadDI(threading.Thread):
 	def _k_cycle(self):
 		self.k__cycle = round(((self.tDIdelay * self.time_k) * self.cycle) - 1)
 
-	def _invers(in_DI, in_invers, in_DIres):
-		if in_DI==1:
+	def _invers(in_DIres, in_invers):
+		if in_DIres==1:
 			if in_invers==1: in_DIres = 0
 			else: in_DIres = 1
 		else:
