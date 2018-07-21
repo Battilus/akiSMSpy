@@ -15,7 +15,6 @@ class ThreadDI(threading.Thread):
 		self._last = [0] * bits	#предидущее состояние входа
 		self.chEN = [0] * bits	#разрешение на изменение флага отправки смс (для блокировки ненужных входов и избежания отпраки ложных смс)
 		self.timeS = [''] * bits	#актуальное время на момент срабатывания входа (для отправки по смс)
-		self._DI_on = [0] * bits #отфильтрованное состояние входа
 		self.DIresult = DIflags	#флаги для отправки СМС (отфильтрованное состояние входа (возвращается в 0 после успешной отправки СМС))
 		self.cycle = t_delay #интервалы опроса входов
 		self.tDIdelay = t_filter #sec время для фильтрации входа
@@ -29,17 +28,14 @@ class ThreadDI(threading.Thread):
 		while self.th_start:
 			self.DI = mDI.readDataFromPort(self.DI, self.bits)
 			for i in range(self.bits):
-				if self.DI[i] == 1 and self.DIresult[i] == 0 and self._last[i] == 0: 
+				if ((self.DI[i] == 1 and self.invers[i] == 0) or (self.DI[i] == 0 and self.invers[i] == 1)) and self.DIresult[i] == 0 and self._last[i] == 0 and self.chEN[i] == 1: 
 					self._DIxt[i] += 1
-				elif self.DI[i] == 0: 
+					# print("{}: {}".format(i, self._DIxt[i]))
+				elif (self.DI[i] == 0 and self.invers[i] == 0) or (self.DI[i] == 1 and self.invers[i] == 1): 
 					self._last[i] = 0
 					self._DIxt[i] = 0
-					self._DI_on[i] = self._invers(0, self.invers[i])
 				
-				if self._DIxt[i] >= self.k__cycle:	#если на входе реально есть сигнал(т.е. на входе непрерывно висит сигнал в течении заданного времени), то:
-					self._DI_on[i] = self._invers(1, self.invers[i])	#инвертируем состоянме входа(если нужно)
-				
-				if self._DI_on[i]==1 and self.chEN[i] == 1 and self._last[i] == 0:
+				if self._DIxt[i] >= self.k__cycle and self.chEN[i] == 1 and self._last[i] == 0:	#если на входе реально есть сигнал(т.е. на входе непрерывно висит сигнал в течении заданного времени), то:
 					self.timeS[i] = getDatetime()	#записываем актуальное время срабатывания входа
 					self.DIresult[i] = 1	#пишем флаг для отправки смс					
 					self._DIxt[i] = 0	#обновляем счетчик фильтрации входа
@@ -55,13 +51,14 @@ class ThreadDI(threading.Thread):
 	def _k_cycle(self):
 		self.k__cycle = round(((self.tDIdelay * self.time_k) * self.cycle) - 1)
 
-	def _invers(in_DIres, in_invers):
+	def _invers(self, in_DIres, in_invers):
 		if in_DIres==1:
 			if in_invers==1: in_DIres = 0
 			else: in_DIres = 1
 		else:
 			if in_invers==1: in_DIres = 1
 			else: in_DIres = 0
+		return in_DIres
 
 
 def main():
@@ -184,16 +181,24 @@ try:
 		sendEN[i] = 1	#УБРАТЬ ПРИ ПОДКЛЮЧЕНИИ К СЕРВАКУ111111111111111111
 
 	DIinvers[1] = 1
+	
 	#Active threads
+	# try:
 	t1 = ThreadDI(BIT, 0.1, t_filterDI, _fs_DI)
 	t1.start()
+	# finally:
+	# 	t1.tstop()
+	# 	t1.join()
+	# 	startPow = 1
+	# 	modPwrOFF()
 	#*********************
 
 	startPow = 0
 	while startPow!=1:	startPow = modSTARTUP()	#Включаем модем
 
-	if __name__ == '__main__':
-		main()
+	if startPow == 1:	#это костыль1111 переделать1111
+		if __name__ == '__main__':
+			main()
 
 except KeyboardInterrupt:
 	print('\n'+"Handle close")
@@ -202,4 +207,8 @@ finally:
 	t1.tstop()
 	t1.join()
 	modPwrOFF()
-		
+	
+"""
+	1: Переделать 1 и 0 на true и false
+	2: Убери срач1
+"""
