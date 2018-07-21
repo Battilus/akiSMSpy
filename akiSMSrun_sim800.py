@@ -112,9 +112,9 @@ def main():
 
  		buff = readmod()	#READ BUFFER
 
- 		if ('+PBREADY' in buff) or tmpCheck==2:	#Если вдруг модем перезапустился, то ребутаем и инициализируемся снова
- 			io.statusLed_H()
- 			error=3
+ 		# if ('+PBREADY' in buff) or tmpCheck==2:	#Если вдруг модем перезапустился, то ребутаем и инициализируемся снова
+ 		# 	io.statusLed_H()
+ 		# 	error=3
 
 		#==========================
 		if tic>=49:	#RUNTIME 5 sec.
@@ -141,7 +141,7 @@ def main():
 		while error>=3:	#Данная секция отвечает за ребут
 			error=0
 			_fl_reboots+=1#######################
-			tmp = modREBOOT()
+			tmp = modREBOOT_sim800()
 			if tmp == -1: error=3	#если неудачно, то ребутаем до усрачки
 			else:
 				error=0
@@ -194,7 +194,7 @@ try:
 	#*********************
 
 	startPow = 0
-	while startPow!=1:	startPow = modSTARTUP()	#Включаем модем
+	while startPow!=1:	startPow = modSTARTUP_sim800()	#Включаем модем
 
 	if startPow == 1:	#это костыль1111 переделать1111
 		if __name__ == '__main__':

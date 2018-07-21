@@ -104,7 +104,7 @@ def modSTART_m590(sleep=3):	#Strat modem (for M590)
 		io.statusLed_L()	#Led BLUE OFF
 		time.sleep(0.5)
 
-def modSTART_D800(sleep=3):	#Strat modem (for D800)
+def modSTART_sim800(sleep=10):	#Strat modem (for sim800)
 	modPwrOFF()
 	io.modON()	#Modem ON
 	time.sleep(sleep)	#sleep 3sec.
@@ -183,6 +183,34 @@ def modSTARTUP():	#Только для старта при начальном п
 			if tmp == -1: return -1
 			else: return 1	#if ALL is OK
 	else: return -1
+
+def modREBOOT_sim800():	#Modem reboot...
+	tmpx = modSTART_sim800(30)	#pwr off/on
+	if tmpx == 1:	#if reboot ok: init
+		sysGetDatetimeToMod()
+		buff = readmod()	#CLEAR BUFFER
+		tmp = mod_init()
+		if tmp == -1: return -1
+		else:
+			tmp = setNet()
+			if tmp == -1: return -1
+			else: return 1	#if ALL is OK
+	else: return -1
+
+def modSTARTUP_sim800():	#Только для старта при начальном пуске
+	#Modem reboot...
+	tmpx = modSTART_sim800(20)	#pwr off/on
+	if tmpx==1:	#if reboot ok: init
+		sysGetDatetimeToMod()
+		buff = readmod()	#CLEAR BUFFER
+		tmp = mod_init()
+		if tmp == -1: return -1
+		else:
+			tmp = setNet()
+			if tmp == -1: return -1
+			else: return 1	#if ALL is OK
+	else: return -1
+
 
 def getTimeFromModem():
 	buff = command('AT+CCLK?')
